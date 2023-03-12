@@ -1,0 +1,75 @@
+name: Deployment
+on: 
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+
+env:
+  AZURE_WEBAPP_NAME: db-sandbox
+  MAIN_BICEP: infrastructure/main.bicep
+  ASSIGN_AD_ROLES_SCRIPT: infrastructure/assign-sp-ad-roles.ps1
+  SQL_FILE: infrastructure/database/assign-database-permissions.sql
+  DIRECTORY_READERS_ROLE: 88d8e3e3-8f55-4a1e-953a-9b9898b8876b
+  DOTNET_VERSION: '7.0.x'
+
+jobs:
+  Deployment:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout self
+        uses: actions/checkout@v3
+      
+      # Setup .NET Core SDK
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }} 
+      
+      # Login to azure with credentials set in project secrets
+      - name: Azure login
+        uses: Azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Deploy infrastructure
+      - name: Deploy azure infrastructure
+        id: deploy
+        uses: azure/arm-deploy@v1
+        with:
+          deploymentName: ${{ env.AZURE_WEBAPP_NAME }}-${{github.run_number}}
+          scope: subscription
+          region: westeurope 
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION }}
+          template: ${{ env.MAIN_BICEP }}
+          parameters: application=${{ env.AZURE_WEBAPP_NAME }} 
+          failOnStdErr: true
+
+      # Set sql server role
+      - name: Set SQL Server role
+        shell: pwsh
+        run: |
+          ${{ env.ASSIGN_AD_ROLES_SCRIPT }} -roleDefinitionId ${{ env.DIRECTORY_READERS_ROLE }} -principalId ${{ steps.deploy.outputs.sqlServerPrincipalId }}
+
+      # Set database permissions
+      - name: Set database permissions
+        uses: azure/sql-action@v2.1.1
+        with:
+          connection-string: Server=${{ steps.deploy.outputs.sqlSrvFullyQualifiedDomainName }};Initial Catalog=${{ steps.deploy.outputs.sqlDatabaseName }};Authentication=Active Directory Default; Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+          path: ${{ env.SQL_FILE }}
+          arguments: -v appService=${{ steps.deploy.outputs.appServiceName }}
+
+      # Run dotnet build and publish
+      - name: Dotnet build and publish
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+          dotnet publish -c Release --output PublishApi src/api/api.csproj
+
+      # Deploy to Azure Web apps
+      - name: Deploy API
+        uses: azure/webapps-deploy@v2
+        with: 
+          app-name: ${{ steps.deploy.outputs.appServiceName }}
+          package: PublishApi
