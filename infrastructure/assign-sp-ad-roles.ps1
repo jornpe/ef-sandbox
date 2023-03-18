@@ -42,10 +42,5 @@ foreach ($principal in $response.value) {
 
 $urlSetRoleAssignment = "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments"
 
-Write-Host $token
-
 Invoke-RestMethod -Method POST -Headers $headers -Uri $urlSetRoleAssignment -Body $body
 Write-Host "Successfully added role to service principal"
-
-# Wait 30 sec so that the new permission gets set cprroin aad
-Start-Sleep -Seconds 30

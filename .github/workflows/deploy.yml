@@ -51,6 +51,8 @@ jobs:
         shell: pwsh
         run: |
           ${{ env.ASSIGN_AD_ROLES_SCRIPT }} -roleDefinitionId ${{ env.DIRECTORY_READERS_ROLE }} -principalId ${{ steps.deploy.outputs.sqlServerPrincipalId }}
+          # Wait 30 sec so that the new permission gets propagated in the aad
+          Start-Sleep -Seconds 30
 
       # Set database permissions
       - name: Set database permissions
