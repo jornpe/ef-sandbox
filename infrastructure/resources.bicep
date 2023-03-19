@@ -9,8 +9,29 @@ var appServiceName = 'apps-${application}'
 var appServicePlanName = 'plan-${application}'
 var sqlServerName = 'sqlsrv-${application}'
 var sqlDbName = 'sqlsrv-${application}'
+var sqlAdminGroup = 'DbAdmins'
 
-// Data resources
+// Get the id of the sqlAdminGroup Group to use when deploying SQL server
+resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+  name: 'GetSqlAdminGroup'
+  location: location
+  kind: 'AzurePowerShell'
+  properties: {
+    azPowerShellVersion: '8.3'
+    timeout: 'PT30M'
+    arguments: '-sqlAdminGroup \\"${sqlAdminGroup}\\"'
+    scriptContent: '''
+      param([string] $sqlAdminGroup)
+      $adminGroupId = ( az ad group show --group  $sqlAdminGroup  | ConvertFrom-Json ).id
+      $DeploymentScriptOutputs = @{}
+      $DeploymentScriptOutputs[\'SqlAdminGroup\'] = $adminGroupId
+    '''
+    cleanupPreference: 'Always'
+    retentionInterval: 'P1D'
+  }
+}
+
+// Deploy SQL server
 resource sqlserver 'Microsoft.Sql/servers@2022-05-01-preview' = {
   name: sqlServerName
   location: location
@@ -21,8 +42,8 @@ resource sqlserver 'Microsoft.Sql/servers@2022-05-01-preview' = {
       azureADOnlyAuthentication: true
       administratorType: 'ActiveDirectory'
       principalType: 'Group'
-      login: 'DbAdmins'
-      sid: 'af9658eb-32a0-4359-8052-dfb4e60fa09b'
+      login: sqlAdminGroup
+      sid: deploymentScript.properties.outputs.SqlAdminGroup
       tenantId: subscription().tenantId
     }
   }
@@ -39,6 +60,7 @@ resource sqlserver 'Microsoft.Sql/servers@2022-05-01-preview' = {
   }
 }
 
+// Database
 resource sqlDatabase 'Microsoft.Sql/servers/databases@2022-05-01-preview' = {
   name: sqlDbName
   parent: sqlserver
@@ -63,6 +85,7 @@ resource hostingPlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   }
 }
 
+// App service
 resource webSite 'Microsoft.Web/sites@2022-03-01' = {
   name: appServiceName
   location: location
