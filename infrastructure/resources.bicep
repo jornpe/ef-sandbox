@@ -4,6 +4,8 @@ param application string
 param tags object
 @description('Location to use for the resources')
 param location string
+@description('Sql admin group id')
+param sqlAdminGroupId string
 
 var appServiceName = 'apps-${application}'
 var appServicePlanName = 'plan-${application}'
@@ -12,24 +14,24 @@ var sqlDbName = 'sqlsrv-${application}'
 var sqlAdminGroup = 'DbAdmins'
 
 // Get the id of the sqlAdminGroup Group to use when deploying SQL server
-resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
-  name: 'GetSqlAdminGroup'
-  location: location
-  kind: 'AzurePowerShell'
-  properties: {
-    azPowerShellVersion: '8.3'
-    timeout: 'PT30M'
-    arguments: '-sqlAdminGroup \\"${sqlAdminGroup}\\"'
-    scriptContent: '''
-      param([string] $sqlAdminGroup)
-      $adminGroupId = ( az ad group show --group  $sqlAdminGroup  | ConvertFrom-Json ).id
-      $DeploymentScriptOutputs = @{}
-      $DeploymentScriptOutputs[\'SqlAdminGroup\'] = $adminGroupId
-    '''
-    cleanupPreference: 'Always'
-    retentionInterval: 'P1D'
-  }
-}
+// resource deploymentScript 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+//   name: 'GetSqlAdminGroup'
+//   location: location
+//   kind: 'AzurePowerShell'
+//   properties: {
+//     azPowerShellVersion: '8.3'
+//     timeout: 'PT30M'
+//     arguments: '-sqlAdminGroup \\"${sqlAdminGroup}\\"'
+//     scriptContent: '''
+//       param([string] $sqlAdminGroup)
+//       $adminGroupId = ( az ad group show --group  $sqlAdminGroup  | ConvertFrom-Json ).id
+//       $DeploymentScriptOutputs = @{}
+//       $DeploymentScriptOutputs[\'SqlAdminGroup\'] = $adminGroupId
+//     '''
+//     cleanupPreference: 'Always'
+//     retentionInterval: 'P1D'
+//   }
+// }
 
 // Deploy SQL server
 resource sqlserver 'Microsoft.Sql/servers@2022-05-01-preview' = {
@@ -43,7 +45,7 @@ resource sqlserver 'Microsoft.Sql/servers@2022-05-01-preview' = {
       administratorType: 'ActiveDirectory'
       principalType: 'Group'
       login: sqlAdminGroup
-      sid: deploymentScript.properties.outputs.SqlAdminGroup
+      sid: sqlAdminGroupId
       tenantId: subscription().tenantId
     }
   }

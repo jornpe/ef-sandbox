@@ -32,6 +32,16 @@ jobs:
         uses: Azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      # Get sql admin group ID
+      - Name: Get sql admin group ID
+        id: getSqlAdminGroup
+        shell: pwsh
+        run: |
+          $groupId = ( az ad group show --group  'DbAdmins'  | ConvertFrom-Json ).id
+          echo "GROUP_ID=$groupId" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+      
+      #Write-Output ( az ad group show --group  'DbAdmins'  | ConvertFrom-Json ).id    # >> "$GITHUB_OUTPUT"
 
       # Deploy infrastructure
       - name: Deploy azure infrastructure
@@ -43,9 +53,9 @@ jobs:
           region: westeurope 
           subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION }}
           template: ${{ env.MAIN_BICEP }}
-          parameters: application=${{ env.AZURE_WEBAPP_NAME }} 
+          parameters: application=${{ env.AZURE_WEBAPP_NAME }} sqlAdminGroupId=${{ env.GROUP_ID }}
           failOnStdErr: true
-
+      
       # Set sql server role
       - name: Set SQL Server role
         shell: pwsh

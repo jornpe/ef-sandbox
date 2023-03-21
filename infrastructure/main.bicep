@@ -1,6 +1,8 @@
 targetScope = 'subscription'
 @description('Name of the project, used in most resource names')
 param application string = 'ef-test-project'
+@description('Sql admin group id')
+param sqlAdminGroupId string
 @description('Location to use for the resources')
 param location string = 'westeurope'
 @description('Name of the resource group to deploy all resources to')
@@ -27,6 +29,7 @@ module resources 'resources.bicep' = {
     tags: tags
     location: location
     application: application
+    sqlAdminGroupId: sqlAdminGroupId
   }
 }
 
