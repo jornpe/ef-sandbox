@@ -34,7 +34,7 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       
       # Get sql admin group ID
-      - Name: Get sql admin group ID
+      - name: Get sql admin group ID
         id: getSqlAdminGroup
         shell: pwsh
         run: |
